@@ -2,11 +2,8 @@
 			   In The Name of God								                  *
  ****************************************************************************/
 
-//`define MAX_ROW 1000
-`define MAX_ROW 10'd50
-//`define MAX_COL 703
-`define MAX_COL 10'd50
-//`define MAX_VALID_MOVES 20003
+`define MAX_ROW 10'd20
+`define MAX_COL 10'd20
 `define MAX_VALID_MOVES 203
 `define empty 3'b000
 `define nocolor 2'b11
@@ -31,6 +28,8 @@ module Trax(output tx, input rx, clk, reset);
 	reg copy_to_map_sig_done;
 	reg shift_right_sig_done;
 	reg shift_down_sig_done;
+
+	reg work_step_done;
 
 	wire end_receive, color;
 	wire [21:0] move_out;
@@ -93,6 +92,8 @@ module Trax(output tx, input rx, clk, reset);
 			choose_move_sig_done <= 1'b0;
 			update_copy_map_sig_done <= 1'b0;
 			copy_to_map_sig_done <= 1'b0;
+
+			work_step_done <= 1'b0;
 
 			move_in <= 22'b0;
 			start_transmit <= 1'b0;
@@ -350,8 +351,9 @@ module Trax(output tx, input rx, clk, reset);
 			if (start_transmit == 1'b1) begin
 				start_transmit <= 1'b0;
 			end
-			if (prev_end_receive == 0 && next_end_receive == 1) begin // Data Received!
-				round = round + 1;				
+			if (prev_end_receive == 0 && next_end_receive == 1) begin
+				round = round + 1;
+				move <= move_out;
 				if (round == 1'b1) begin
 					if(color == `white) begin
 						k = 2;
@@ -365,37 +367,44 @@ module Trax(output tx, input rx, clk, reset);
 				 	end  
 				end
 				else begin
-					if (step == 0) begin
-						move <= move_out;
-						update_copy_map_sig <= 1'b1;
-						step = step + 1;
-					end
-					else if (step == 1 && update_copy_map_sig_done) begin
-						update_copy_map_sig_done <= 1'b0;
-						copy_to_map_sig <= 1'b1;
-						step = step + 1;
-					end
-					else if (step == 2 && copy_to_map_sig_done) begin
-						copy_to_map_sig_done <= 1'b0;
-						choose_move_sig <= 1'b1;
-						step = step + 1;
-					end
-					else if (step == 3 && choose_move_sig_done) begin
-						choose_move_sig_done <= 1'b0;
-						update_copy_map_sig <= 1'b1;
-						step = step + 1;
-					end
-					else if (step == 4 && update_copy_map_sig_done) begin
-						update_copy_map_sig_done = 1'b0;
-						copy_to_map_sig = 1'b1;
-						step = step + 1;
-					end
-					else begin
-						copy_to_map_sig_done <= 1'b0;
-						start_transmit <= 1'b1;
-						step = 0;
-					end
-				end	 
+					work_step_done <= 1'b0;
+				end
+			end
+			else if (~(prev_end_receive == 0 && next_end_receive == 1) && work_step_done == 1'b0) begin // Data Received!
+				if (step == 0) begin
+					move <= move_out;
+					update_copy_map_sig <= 1'b1;
+					step = step + 1;
+				end
+				else if (step == 1 && update_copy_map_sig_done) begin
+					update_copy_map_sig_done <= 1'b0;
+					copy_to_map_sig <= 1'b1;
+					step = step + 1;
+				end
+				else if (step == 2 && copy_to_map_sig_done) begin
+					copy_to_map_sig_done <= 1'b0;
+					choose_move_sig <= 1'b1;
+					step = step + 1;
+				end
+				else if (step == 3 && choose_move_sig_done) begin
+					choose_move_sig_done <= 1'b0;
+					update_copy_map_sig <= 1'b1;
+					step = step + 1;
+				end
+				else if (step == 4 && update_copy_map_sig_done) begin
+					update_copy_map_sig_done = 1'b0;
+					copy_to_map_sig = 1'b1;
+					step = step + 1;
+				end
+				else begin
+					copy_to_map_sig_done <= 1'b0;
+					start_transmit <= 1'b1;
+					work_step_done <= 1'b1;
+					step = 0;
+				end
+			end
+			else begin
+
 			end
 		end
 	end
