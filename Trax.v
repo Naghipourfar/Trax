@@ -256,7 +256,7 @@ module Trax(output tx, input rx, clk, reset);
 			end
 		end
 		else if (copy_to_map_sig) begin
-		  	if (i <= `MAX_ROW-1 && j <= `MAX_COL-1) begin
+		  	if (i <= n - 1 && j < m - 1) begin
 				j = j + 1;
 				game_table[i][j] = game_table_copy[i][j];
 				if (n < `MAX_ROW)
@@ -266,11 +266,11 @@ module Trax(output tx, input rx, clk, reset);
 					if(game_table_copy[i][m-1] != `empty)
 						flag2 = 1'b1;	
 				if(game_table_copy[0][j] != `empty)
-					flag3 = 1'b1;	
+					flag3 = 1'b1;
 				if(game_table_copy[i][0] != `empty)
 					flag4 = 1'b1;	
 			end
-			else if (i <= n - 1 && j >= m) begin
+			else if (i <= n - 1 && j >= m - 1) begin
 				i = i + 1;
 				j = 0;
 				game_table[i][j] = game_table_copy[i][j];
@@ -296,13 +296,13 @@ module Trax(output tx, input rx, clk, reset);
 					m = m+1; 
 				
 				if(flag3 == 1'b1) begin			// Shift Down
-					shift_down_i = `MAX_ROW-2;
+					shift_down_i = n - 2;
 					shift_down_j = -1;
 					shift_down_sig = 1'b1;
 				end
 				if(flag4 == 1'b1) begin			// Shift Right
 					shift_right_i = 0;
-					shift_right_j = `MAX_COL - 1;
+					shift_right_j = m - 1;
 					shift_right_sig = 1'b1;
 				end
 				if(n > `MAX_ROW)
@@ -322,10 +322,10 @@ module Trax(output tx, input rx, clk, reset);
 					game_table[shift_down_i+1][shift_down_j] = game_table[shift_down_i][shift_down_j];
 				end
 			end
-			else if (shift_down_i >= n - 1 && shift_down_j >= m - 1) begin
+			else if (shift_down_i >= 0 && shift_down_j >= m - 1) begin
 				shift_down_i = shift_down_i - 1;
 				shift_down_j = 0;
-				if(shift_down_i < n && shift_down_j < m) begin
+				if(shift_down_i < n && shift_down_j < m && shift_down_i >= 0) begin
 					game_table[shift_down_i+1][shift_down_j] = game_table[shift_down_i][shift_down_j];
 				end
 				j = -1;
@@ -345,14 +345,14 @@ module Trax(output tx, input rx, clk, reset);
 		else if (shift_right_sig) begin
 			if (shift_right_i <= n - 1 && shift_right_j >= 0) begin
 				shift_right_j = shift_right_j - 1;
-				if(shift_right_i < `MAX_ROW && shift_right_j < `MAX_COL) begin
+				if(shift_right_i < n && shift_right_j < m && shift_right_j >= 0) begin
 					game_table[shift_right_i][shift_right_j+1] = game_table[shift_right_i][shift_right_j];
 				end
 			end
 			else if (shift_right_i <= n - 1 && shift_right_j < 0) begin
 				shift_right_i = shift_right_i + 1;
-				shift_right_j = `MAX_COL - 2;
-				if(shift_right_i < `MAX_ROW && shift_right_j < `MAX_COL) begin
+				shift_right_j = m - 1;
+				if(shift_right_i < n && shift_right_j < m) begin
 					game_table[shift_right_i][shift_right_j+1] = game_table[shift_right_i][shift_right_j];
 				end
 				i = -1;
