@@ -29,6 +29,8 @@ module Trax(output tx, input rx, clk, reset);
 	reg shift_right_sig_done;
 	reg shift_down_sig_done;
 
+
+	reg is_table_changed;
 	reg work_step_done;
 
 	wire end_receive, color;
@@ -97,6 +99,7 @@ module Trax(output tx, input rx, clk, reset);
 			copy_to_map_sig_done <= 1'b0;
 
 			work_step_done <= 1'b0;
+			is_table_changed <= 1'b0;
 
 			move_in <= 22'b0;
 			start_transmit <= 1'b0;
@@ -116,14 +119,14 @@ module Trax(output tx, input rx, clk, reset);
 		  	n <= 1;
 		end
 		else if (auto_complete_sig) begin
-			if (i <= n - 1 && j <= m - 1) begin
+			if (i <= n - 1 && j < m - 1) begin
 				j = j + 1;
 				auto_complete_up_cell = (i > 0) ? game_table_copy[i - 1][j] : 3'b000;
 				auto_complete_right_cell = (j <= m - 2) ? game_table_copy[i][j + 1] : 3'b000;
 				auto_complete_down_cell = (i <= n - 2) ? game_table_copy[i + 1][j] : 3'b000;
 				auto_complete_left_cell = (j > 0) ? game_table_copy[i][j - 1] : 3'b000;
 			end
-			else if (i <= n - 1 && j >= m) begin
+			else if (i <= n - 1 && j >= m - 1) begin
 				i = i + 1;
 				j = 0;
 				auto_complete_up_cell = (i > 0) ? game_table_copy[i - 1][j] : 3'b000;
@@ -134,23 +137,31 @@ module Trax(output tx, input rx, clk, reset);
 			else begin	// Auto Complete is Done!
 				i = 0;
 				j = -1;
-				auto_complete_sig = 1'b0;
+				if (is_table_changed) begin
+					auto_complete_sig = 1'b1;
+					auto_complete_sig_done = 1'b0;
+					update_copy_map_sig_done = 1'b0;
+				end
+				else begin
+					auto_complete_sig_done = 1'b1;
+					update_copy_map_sig_done = 1'b1;
+					auto_complete_sig = 1'b0;
+				end
 			end
 			if (auto_complete_is_table_changed == 1'b1) begin
+				is_table_changed <= is_table_changed || auto_complete_is_table_changed;
 				game_table_copy[i][j] = auto_complete_out_cell;
-				auto_complete_sig_done = 1'b1;
-				update_copy_map_sig_done = 1'b1;
 			end
 		end
 		else if (choose_move_sig) begin
-			if (r <= n - 1 && c <= m - 1) begin
+			if (r <= n - 1 && c < m - 1) begin
 				c = c + 1;
 				update_valid_move_up_cell = (r > 0) ? game_table[r - 1][c] : 3'b000;
 				update_valid_move_right_cell = (c <= m - 2) ? game_table[r][c + 1] : 3'b000;
 				update_valid_move_down_cell = (r <= n - 2) ? game_table[r + 1][c] : 3'b000;
 				update_valid_move_left_cell = (c > 0) ? game_table[r][c - 1] : 3'b000;
 			end
-			else if (r <= n - 1 && c >= m) begin
+			else if (r <= n - 1 && c >= m - 1) begin
 				r = r + 1;
 				c = 0;
 				update_valid_move_up_cell = (r > 0) ? game_table[r - 1][c] : 3'b000;
@@ -178,11 +189,11 @@ module Trax(output tx, input rx, clk, reset);
 			end
 		end
 		else if (update_copy_map_sig) begin
-			if (i <= n - 1 && j <= m - 1) begin
+			if (i <= n - 1 && j < m - 1) begin
 				j = j + 1;
 				game_table_copy[i][j] = game_table[i][j];
 			end
-			else if (i <= n - 1 && j >= m) begin
+			else if (i <= n - 1 && j >= m - 1) begin
 				i = i + 1;
 				j = 0;
 				game_table_copy[i][j] = game_table[i][j];
@@ -245,10 +256,6 @@ module Trax(output tx, input rx, clk, reset);
 			end
 		end
 		else if (copy_to_map_sig) begin
-			flag1 = 1'b0;
-			flag2 = 1'b0;
-  			flag3 = 1'b0;
-		  	flag4 = 1'b0;
 		  	if (i <= `MAX_ROW-1 && j <= `MAX_COL-1) begin
 				j = j + 1;
 				game_table[i][j] = game_table_copy[i][j];
@@ -309,16 +316,16 @@ module Trax(output tx, input rx, clk, reset);
 			// now game_table is updated and n & m are updated too. 					
 		end
 		else if (shift_down_sig) begin
-			if (shift_down_i >= 0 && shift_down_j <= m - 1) begin
+			if (shift_down_i >= 0 && shift_down_j < m - 1) begin
 				shift_down_j = shift_down_j + 1;
-				if(shift_down_i < `MAX_ROW && shift_down_j < `MAX_COL) begin
+				if(shift_down_i < n && shift_down_j < m) begin
 					game_table[shift_down_i+1][shift_down_j] = game_table[shift_down_i][shift_down_j];
 				end
 			end
-			else if (shift_down_i >= n - 1 && shift_down_j >= m) begin
+			else if (shift_down_i >= n - 1 && shift_down_j >= m - 1) begin
 				shift_down_i = shift_down_i - 1;
 				shift_down_j = 0;
-				if(shift_down_i < `MAX_ROW && shift_down_j < `MAX_COL) begin
+				if(shift_down_i < n && shift_down_j < m) begin
 					game_table[shift_down_i+1][shift_down_j] = game_table[shift_down_i][shift_down_j];
 				end
 				j = -1;
@@ -397,6 +404,10 @@ module Trax(output tx, input rx, clk, reset);
 				else if (step == 1 && update_copy_map_sig_done) begin
 					update_copy_map_sig_done <= 1'b0;
 					copy_to_map_sig <= 1'b1;
+					flag1 = 1'b0;
+					flag2 = 1'b0;
+		  			flag3 = 1'b0;
+				  	flag4 = 1'b0;
 					step = step + 1;
 				end
 				else if (step == 2 && copy_to_map_sig_done) begin
@@ -406,12 +417,17 @@ module Trax(output tx, input rx, clk, reset);
 				end
 				else if (step == 3 && choose_move_sig_done) begin
 					choose_move_sig_done <= 1'b0;
+					move = valid_moves[0];
 					update_copy_map_sig <= 1'b1;
 					step = step + 1;
 				end
 				else if (step == 4 && update_copy_map_sig_done) begin
 					update_copy_map_sig_done = 1'b0;
 					copy_to_map_sig = 1'b1;
+					flag1 = 1'b0;
+					flag2 = 1'b0;
+		  			flag3 = 1'b0;
+				  	flag4 = 1'b0;
 					step = step + 1;
 				end
 				else begin
