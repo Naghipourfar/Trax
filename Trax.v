@@ -2,8 +2,8 @@
 			   In The Name of God								                  *
  ****************************************************************************/
 
-`define MAX_ROW 10'd20
-`define MAX_COL 10'd20
+`define MAX_ROW 10'd5
+`define MAX_COL 10'd5
 `define MAX_VALID_MOVES 203
 `define empty 3'b000
 `define nocolor 2'b11
@@ -290,10 +290,10 @@ module Trax(output tx, input rx, clk, reset);
 				j = -1;
 				// All of this 4 functions for first move and one of them for other moves
 				if(flag1 == 1'b1)
-					n = n+1;
+					n = n + 1'b1;
 				
 				if(flag2 == 1'b1)
-					m = m+1; 
+					m = m + 1'b1; 
 				
 				if(flag3 == 1'b1) begin			// Shift Down
 					shift_down_i = n - 2;
