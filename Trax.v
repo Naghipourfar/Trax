@@ -379,7 +379,7 @@ module Trax(output tx, input rx, clk, reset);
 						valid_moves[0] = {`plus, 10'b0, 10'b0 };
 						valid_moves[1] = {`slash, 10'b0, 10'b0 };
 						move_in = valid_moves[0];
-						move = move_in;
+						move <= move_in;
 					 	update_copy_map_sig <= 1'b1;
 					 	copy_to_map_sig <= 1'b1;
 					 	start_transmit <= 1'b1;
