@@ -52,10 +52,13 @@ module Trax(output tx, input rx, clk, reset);
 	reg a[1:0];
 	wire auto_complete_is_table_changed;
 	wire [2:0] auto_complete_out_cell;
+
+	reg [2:0] auto_complete_up_cell, auto_complete_right_cell, auto_complete_down_cell, auto_complete_left_cell;
+	reg [2:0] update_valid_move_up_cell, update_valid_move_right_cell, update_valid_move_down_cell, update_valid_move_left_cell;
 	
 	Tranceiver t(move_out, end_receive, color, tx, move_in, rx, start_transmit, clk, reset);
-	AutoComplete ac(auto_complete_is_table_changed, auto_complete_out_cell, game_table_copy[i-1][j], game_table_copy[i][j+1], game_table_copy[i+1][j], game_table_copy[i][j-1], game_table_copy[i][j], i, j, n, m);
-	UpdateValidMove uvm(update_valid_move_0, update_valid_move_1, update_valid_move_2, update_valid_move_k, game_table[r-1][c], game_table[r][c+1], game_table[r+1][c], game_table[r][c-1], r, c, k, n, m);  
+	AutoComplete ac(auto_complete_is_table_changed, auto_complete_out_cell, auto_complete_up_cell, auto_complete_right_cell, auto_complete_down_cell, auto_complete_left_cell, game_table_copy[i][j], i, j, n, m);
+	UpdateValidMove uvm(update_valid_move_0, update_valid_move_1, update_valid_move_2, update_valid_move_k, update_valid_move_up_cell, update_valid_move_right_cell, update_valid_move_down_cell, update_valid_move_left_cell, r, c, k, n, m);  
 
 	reg prev_end_receive;
 	reg next_end_receive;
@@ -115,10 +118,18 @@ module Trax(output tx, input rx, clk, reset);
 		else if (auto_complete_sig) begin
 			if (i <= n - 1 && j <= m - 1) begin
 				j = j + 1;
+				auto_complete_up_cell = (i > 0) ? game_table_copy[i - 1][j] : 3'b000;
+				auto_complete_right_cell = (j <= m - 2) ? game_table_copy[i][j + 1] : 3'b000;
+				auto_complete_down_cell = (i <= n - 2) ? game_table_copy[i + 1][j] : 3'b000;
+				auto_complete_left_cell = (j > 0) ? game_table_copy[i][j - 1] : 3'b000;
 			end
 			else if (i <= n - 1 && j >= m) begin
 				i = i + 1;
 				j = 0;
+				auto_complete_up_cell = (i > 0) ? game_table_copy[i - 1][j] : 3'b000;
+				auto_complete_right_cell = (j <= m - 2) ? game_table_copy[i][j + 1] : 3'b000;
+				auto_complete_down_cell = (i <= n - 2) ? game_table_copy[i + 1][j] : 3'b000;
+				auto_complete_left_cell = (j > 0) ? game_table_copy[i][j - 1] : 3'b000;
 			end
 			else begin	// Auto Complete is Done!
 				i = 0;
@@ -134,10 +145,18 @@ module Trax(output tx, input rx, clk, reset);
 		else if (choose_move_sig) begin
 			if (r <= n - 1 && c <= m - 1) begin
 				c = c + 1;
+				update_valid_move_up_cell = (r > 0) ? game_table[r - 1][c] : 3'b000;
+				update_valid_move_right_cell = (c <= m - 2) ? game_table[r][c + 1] : 3'b000;
+				update_valid_move_down_cell = (r <= n - 2) ? game_table[r + 1][c] : 3'b000;
+				update_valid_move_left_cell = (c > 0) ? game_table[r][c - 1] : 3'b000;
 			end
 			else if (r <= n - 1 && c >= m) begin
 				r = r + 1;
 				c = 0;
+				update_valid_move_up_cell = (r > 0) ? game_table[r - 1][c] : 3'b000;
+				update_valid_move_right_cell = (c <= m - 2) ? game_table[r][c + 1] : 3'b000;
+				update_valid_move_down_cell = (r <= n - 2) ? game_table[r + 1][c] : 3'b000;
+				update_valid_move_left_cell = (c > 0) ? game_table[r][c - 1] : 3'b000;
 			end
 			else begin	// Choose Move is Done!
 				r = 0;
