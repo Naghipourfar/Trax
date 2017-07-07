@@ -190,60 +190,59 @@ module Trax(output tx, input rx, clk, reset);
 			else begin
 				i = 0;
 				j = -1;
-			end
+				r = move[9:0];
+				c = move[19:10];
+				game_table_copy[r][c][2:1] = move[21:20];
 
-			r = move[9:0];
-			c = move[19:10];
-			game_table_copy[r][c][2:1] = move[21:20];
+				// update from up
+				if (r > 0) begin
+					if (game_table_copy[r-1][c] != `empty) begin
+						if(game_table_copy[r-1][c][2:1] == `plus)
+							game_table_copy[r][c][0] = game_table_copy[r-1][c][0]; 
+						else
+							game_table_copy[r][c][0] = ~game_table_copy[r-1][c][0];
+					end
+				end
+				// update from down
+				if(r < n-1 && r < `MAX_ROW-1) begin
+					if(game_table_copy[r+1][c] != `empty) begin
+						if(game_table_copy[r][c][2:1] == `plus)
+							game_table_copy[r][c][0] = game_table_copy[r+1][c][0];
+						else
+							game_table_copy[r][c][0] = ~game_table_copy[r+1][c][0];
+					end
+				end
+				
+				// update from left
+				if(c > 0) begin
+					if(game_table_copy[r][c-1] != `empty) begin
+						if( (game_table_copy[r][c-1][2:1] != `bslash && game_table_copy[r][c][2:1] != `slash) ||
+							(game_table_copy[r][c-1][2:1] == `bslash && game_table_copy[r][c][2:1] == `slash) )
+							game_table_copy[r][c][0] = game_table_copy[r][c-1][0];
+						else
+							game_table_copy[r][c][0] = ~game_table_copy[r][c-1][0];
+					end
+				end
 
-			// update from up
-			if (r > 0) begin
-				if (game_table_copy[r-1][c] != `empty) begin
-					if(game_table_copy[r-1][c][2:1] == `plus)
-						game_table_copy[r][c][0] = game_table_copy[r-1][c][0]; 
-					else
-						game_table_copy[r][c][0] = ~game_table_copy[r-1][c][0];
+				// update from right
+				if(c < m-1 && c < `MAX_COL-1) begin
+					if(game_table_copy[r][c+1] != `empty) begin
+						if( (game_table_copy[r][c+1][2:1] != `slash && game_table_copy[r][c][2:1] != `bslash) ||
+							(game_table_copy[r][c+1][2:1] == `slash && game_table_copy[r][c][2:1] == `bslash) )
+							game_table_copy[r][c][0] = game_table_copy[r][c+1][0];
+						else
+							game_table_copy[r][c][0] = ~game_table_copy[r][c+1][0];
+					end
 				end
-			end
-			// update from down
-			if(r < n-1 && r < `MAX_ROW-1) begin
-				if(game_table_copy[r+1][c] != `empty) begin
-					if(game_table_copy[r][c][2:1] == `plus)
-						game_table_copy[r][c][0] = game_table_copy[r+1][c][0];
-					else
-						game_table_copy[r][c][0] = ~game_table_copy[r+1][c][0];
+				
+				// first move
+				if(n == 1'b1 && m == 1'b1) begin
+					game_table_copy[r][c][0] = `white;
 				end
-			end
-			
-			// update from left
-			if(c > 0) begin
-				if(game_table_copy[r][c-1] != `empty) begin
-					if( (game_table_copy[r][c-1][2:1] != `bslash && game_table_copy[r][c][2:1] != `slash) ||
-						(game_table_copy[r][c-1][2:1] == `bslash && game_table_copy[r][c][2:1] == `slash) )
-						game_table_copy[r][c][0] = game_table_copy[r][c-1][0];
-					else
-						game_table_copy[r][c][0] = ~game_table_copy[r][c-1][0];
-				end
-			end
 
-			// update from right
-			if(c < m-1 && c < `MAX_COL-1) begin
-				if(game_table_copy[r][c+1] != `empty) begin
-					if( (game_table_copy[r][c+1][2:1] != `slash && game_table_copy[r][c][2:1] != `bslash) ||
-						(game_table_copy[r][c+1][2:1] == `slash && game_table_copy[r][c][2:1] == `bslash) )
-						game_table_copy[r][c][0] = game_table_copy[r][c+1][0];
-					else
-						game_table_copy[r][c][0] = ~game_table_copy[r][c+1][0];
-				end
+				update_copy_map_sig = 1'b0;
+				auto_complete_sig = 1'b1;	// Call Auto Complete Function
 			end
-			
-			// first move
-			if(n == 1'b1 && m == 1'b1) begin
-				game_table_copy[r][c][0] = `white;
-			end
-
-			update_copy_map_sig = 1'b0;
-			auto_complete_sig = 1'b1;	// Call Auto Complete Function
 		end
 		else if (copy_to_map_sig) begin
 			flag1 = 1'b0;
