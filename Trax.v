@@ -126,7 +126,7 @@ module Trax(output tx, input rx, clk, reset);
 				auto_complete_down_cell = (i <= n - 2) ? game_table_copy[i + 1][j] : 3'b000;
 				auto_complete_left_cell = (j > 0) ? game_table_copy[i][j - 1] : 3'b000;
 			end
-			else if (i <= n - 1 && j >= m - 1) begin
+			else if (i <= n - 2 && j >= m - 1) begin
 				i = i + 1;
 				j = 0;
 				auto_complete_up_cell = (i > 0) ? game_table_copy[i - 1][j] : 3'b000;
@@ -138,6 +138,7 @@ module Trax(output tx, input rx, clk, reset);
 				i = 0;
 				j = -1;
 				if (is_table_changed) begin
+					is_table_changed = 1'b0;
 					auto_complete_sig = 1'b1;
 					auto_complete_sig_done = 1'b0;
 					update_copy_map_sig_done = 1'b0;
@@ -193,7 +194,7 @@ module Trax(output tx, input rx, clk, reset);
 				j = j + 1;
 				game_table_copy[i][j] = game_table[i][j];
 			end
-			else if (i <= n - 1 && j >= m - 1) begin
+			else if (i <= n - 2 && j >= m - 1) begin
 				i = i + 1;
 				j = 0;
 				game_table_copy[i][j] = game_table[i][j];
@@ -253,6 +254,8 @@ module Trax(output tx, input rx, clk, reset);
 
 				update_copy_map_sig = 1'b0;
 				auto_complete_sig = 1'b1;	// Call Auto Complete Function
+				r = 0;
+				c = -1;
 			end
 		end
 		else if (copy_to_map_sig) begin
@@ -442,7 +445,4 @@ module Trax(output tx, input rx, clk, reset);
 			end
 		end
 	end
-
-
-
 endmodule
