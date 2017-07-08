@@ -56,11 +56,11 @@ module Trax(output tx, input rx, clk, reset);
 	wire [2:0] auto_complete_out_cell;
 
 	reg [2:0] auto_complete_up_cell, auto_complete_right_cell, auto_complete_down_cell, auto_complete_left_cell;
-	reg [2:0] update_valid_move_up_cell, update_valid_move_right_cell, update_valid_move_down_cell, update_valid_move_left_cell;
+	reg [2:0] update_valid_move_up_cell, update_valid_move_right_cell, update_valid_move_down_cell, update_valid_move_left_cell, update_valid_move_curr_cell;
 	
 	Tranceiver t(move_out, end_receive, color, tx, move_in, rx, start_transmit, clk, reset);
 	AutoComplete ac(auto_complete_is_table_changed, auto_complete_out_cell, auto_complete_up_cell, auto_complete_right_cell, auto_complete_down_cell, auto_complete_left_cell, game_table_copy[i][j], i, j, n, m);
-	UpdateValidMove uvm(update_valid_move_0, update_valid_move_1, update_valid_move_2, update_valid_move_k, update_valid_move_up_cell, update_valid_move_right_cell, update_valid_move_down_cell, update_valid_move_left_cell, r, c, k, n, m);  
+	UpdateValidMove uvm(update_valid_move_0, update_valid_move_1, update_valid_move_2, update_valid_move_k, update_valid_move_up_cell, update_valid_move_right_cell, update_valid_move_down_cell, update_valid_move_left_cell, update_valid_move_curr_cell, r, c, k, n, m);  
 
 	reg prev_end_receive;
 	reg next_end_receive;
@@ -98,7 +98,7 @@ module Trax(output tx, input rx, clk, reset);
 			update_copy_map_sig_done <= 1'b0;
 			copy_to_map_sig_done <= 1'b0;
 
-			work_step_done <= 1'b0;
+			work_step_done <= 1'b1;
 			is_table_changed <= 1'b0;
 
 			move_in <= 22'b0;
@@ -110,13 +110,17 @@ module Trax(output tx, input rx, clk, reset);
 				end
 		  	end
 		  	for(i=0;i<`MAX_VALID_MOVES;i=i+1) begin
-			  	valid_moves[i] <= 21'b0;
+			  	valid_moves[i] <= 22'b0;
 		  	end
 		  	step <= 0;
 		  	m <= 1;
 		  	k <= 0;
 		  	round <= 0;
 		  	n <= 1;
+		  	i = 0;
+		  	j = -1;
+		  	r = 0;
+		  	c = -1;
 		end
 		else if (auto_complete_sig) begin
 			if (i <= n - 1 && j < m - 1) begin
@@ -157,14 +161,16 @@ module Trax(output tx, input rx, clk, reset);
 		else if (choose_move_sig) begin
 			if (r <= n - 1 && c < m - 1) begin
 				c = c + 1;
+				update_valid_move_curr_cell = game_table[r][c];
 				update_valid_move_up_cell = (r > 0) ? game_table[r - 1][c] : 3'b000;
 				update_valid_move_right_cell = (c <= m - 2) ? game_table[r][c + 1] : 3'b000;
 				update_valid_move_down_cell = (r <= n - 2) ? game_table[r + 1][c] : 3'b000;
 				update_valid_move_left_cell = (c > 0) ? game_table[r][c - 1] : 3'b000;
 			end
-			else if (r <= n - 1 && c >= m - 1) begin
+			else if (r <= n - 2 && c >= m - 1) begin
 				r = r + 1;
 				c = 0;
+				update_valid_move_curr_cell = game_table[r][c];				
 				update_valid_move_up_cell = (r > 0) ? game_table[r - 1][c] : 3'b000;
 				update_valid_move_right_cell = (c <= m - 2) ? game_table[r][c + 1] : 3'b000;
 				update_valid_move_down_cell = (r <= n - 2) ? game_table[r + 1][c] : 3'b000;
@@ -177,13 +183,13 @@ module Trax(output tx, input rx, clk, reset);
 				choose_move_sig_done = 1'b1;
 			end 
 			if (k != update_valid_move_k) begin
-				if (update_valid_move_0 !== 22'bx) begin
+				if (update_valid_move_0 != 22'b0) begin
 					valid_moves[k] = update_valid_move_0;
 				end
-				if (update_valid_move_1 !== 22'bx) begin
+				if (update_valid_move_1 != 22'b0) begin
 					valid_moves[k+1] = update_valid_move_1;
 				end
-				if (update_valid_move_2 !== 22'bx) begin
+				if (update_valid_move_2 != 22'b0) begin
 					valid_moves[k+2] = update_valid_move_2;
 				end
 				k = update_valid_move_k;
@@ -396,7 +402,7 @@ module Trax(output tx, input rx, clk, reset);
 				 	end  
 				end
 				else begin
-					work_step_done <= 1'b0;
+					work_step_done <= 1'b1;
 				end
 			end
 			else if (~(prev_end_receive == 0 && next_end_receive == 1) && work_step_done == 1'b0) begin // Data Received!
@@ -417,6 +423,8 @@ module Trax(output tx, input rx, clk, reset);
 				else if (step == 2 && copy_to_map_sig_done) begin
 					copy_to_map_sig_done <= 1'b0;
 					choose_move_sig <= 1'b1;
+					r = 0;
+					c = -1;
 					step = step + 1;
 				end
 				else if (step == 3 && choose_move_sig_done) begin
@@ -442,7 +450,7 @@ module Trax(output tx, input rx, clk, reset);
 				end
 			end
 			else begin
-
+				//$display("We Are DEAD!!");
 			end
 		end
 	end
