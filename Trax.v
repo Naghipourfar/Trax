@@ -1,8 +1,9 @@
 /****************************************************************************
-			   				In The Name of God								                  
+			   In The Name of God								                  *
  ****************************************************************************/
-`define MAX_ROW 10'd20
-`define MAX_COL 10'd20
+
+`define MAX_ROW 10'd5
+`define MAX_COL 10'd5
 `define MAX_VALID_MOVES 203
 `define empty 3'b000
 `define nocolor 2'b11
@@ -13,533 +14,444 @@
 `define white 0
 
 module Trax(output tx, input rx, clk, reset);
+	
+	reg auto_complete_sig;
+	reg choose_move_sig;
+	reg update_copy_map_sig;
+	reg copy_to_map_sig;
+	reg shift_right_sig;
+	reg shift_down_sig;
+
+	reg auto_complete_sig_done;
+	reg choose_move_sig_done;
+	reg update_copy_map_sig_done;
+	reg copy_to_map_sig_done;
+	reg shift_right_sig_done;
+	reg shift_down_sig_done;
+
+
+	reg is_table_changed;
+	reg work_step_done;
+
 	wire end_receive, color;
 	wire [21:0] move_out;
 	reg [21:0] move_in;
+	reg [21:0] move;
 	reg start_transmit;
 	reg [2:0] game_table[`MAX_ROW - 1:0][`MAX_COL - 1:0];
 	reg [2:0] game_table_copy[`MAX_ROW - 1:0][`MAX_COL - 1:0];
 	reg [21:0] valid_moves [`MAX_VALID_MOVES - 1:0];
+	wire [21:0] update_valid_move_0, update_valid_move_1, update_valid_move_2;
 	integer i, j;
-	integer n, m, k; // number of rows, number of columns, number of valid moves 
-	integer round; 
+	integer shift_down_i, shift_down_j;
+	integer shift_right_i, shift_right_j;
+	reg[9:0] n, m; // number of rows, number of columns, number of valid moves 
+	reg [9:0] k;
+	wire [9:0] update_valid_move_k;
+	integer round;
+	integer r, c;
+	integer step;
 	reg a[1:0];
+	wire auto_complete_is_table_changed;
+	wire [2:0] auto_complete_out_cell;
+
+	reg [2:0] auto_complete_up_cell, auto_complete_right_cell, auto_complete_down_cell, auto_complete_left_cell;
+	reg [2:0] update_valid_move_up_cell, update_valid_move_right_cell, update_valid_move_down_cell, update_valid_move_left_cell, update_valid_move_curr_cell;
 	
 	Tranceiver t(move_out, end_receive, color, tx, move_in, rx, start_transmit, clk, reset);
-	  
+	AutoComplete ac(auto_complete_is_table_changed, auto_complete_out_cell, auto_complete_up_cell, auto_complete_right_cell, auto_complete_down_cell, auto_complete_left_cell, game_table_copy[i][j], i, j, n, m);
+	UpdateValidMove uvm(update_valid_move_0, update_valid_move_1, update_valid_move_2, update_valid_move_k, update_valid_move_up_cell, update_valid_move_right_cell, update_valid_move_down_cell, update_valid_move_left_cell, update_valid_move_curr_cell, r, c, k, n, m);  
+
 	reg prev_end_receive;
 	reg next_end_receive;
 
-
-	  
-	always @(posedge clk) begin
-		if(reset) begin
-		  prev_end_receive = 1'b1;
-		  next_end_receive = 1'b1;
-		  move_in = 22'b0;
-		  start_transmit = 1'b0;
-		  for(i=0;i<`MAX_ROW;i=i+1) begin
-			for(j=0;j<`MAX_COL;j=j+1) begin
-			  game_table[i][j] = `empty;
-			  game_table_copy[i][j] = `empty;
-			end
-		  end
-		  for(i=0;i<`MAX_VALID_MOVES;i=i+1) begin
-			  valid_moves[i] = 21'b0;
-		  end
-		  m = 1; n = 1; k = 0;
-		  round = 0;
-		end
-	
-		prev_end_receive = next_end_receive;
-		next_end_receive = end_receive;
-	
-		if(start_transmit == 1'b1)
-		  start_transmit = 1'b0;
-	
-		if (prev_end_receive == 0 && next_end_receive == 1) begin // Start Receiving
-		  round = round + 1;
-	
-		  if (round == 1'b1) begin
-			 if(color == `white)
-			 begin
-				  if (a[0] === 1'bx) a[0] = 1'bx;
-				  chooseFirstMove(move_in);
-				  updateCopyMap(move_in);
-				  copyToMap();
-				  start_transmit = 1'b1;
-			 end  
-		  end	 
-		  else begin
-			updateCopyMap(move_out);
-			if (a[0] === 1'bx) a[0] = 1'bx;
-			copyToMap();
-			if (a[0] === 1'bx) a[0] = 1'bx;
-			chooseMove(move_in);
-			if (a[0] === 1'bx) a[0] = 1'bx;
-			updateCopyMap(move_in);
-			if (a[0] === 1'bx) a[0] = 1'bx;
-			copyToMap();
-			if (a[0] === 1'bx) a[0] = 1'bx;
-			start_transmit = 1'b1;
-		  end
-		end
-	end
-	
-
-
-
-
-
-
-	task copyToMap();
-	integer i, j;
 	reg flag1, flag2, flag3, flag4;
-	begin
-	  flag1 = 1'b0;
-	  flag2 = 1'b0;
-	  flag3 = 1'b0;
-	  flag4 = 1'b0;
-		for(i=0; i<n && i<`MAX_ROW; i=i+1)
-			for(j=0; j<m && j<`MAX_COL; j=j+1)
-				game_table[i][j] = game_table_copy[i][j];
-				
-		for(j=0; j<m && j<`MAX_COL; j=j+1)
-			if(n < `MAX_ROW)
-			if(game_table[n-1][j] != `empty)
-				flag1 = 1'b1;
-				
-		for(i=0; i<n && i<`MAX_ROW; i=i+1)
-			if(m < `MAX_COL)
-			if(game_table[i][m-1] != `empty)
-				flag2 = 1'b1;	
-				
-		for(j=0; j<m && j<`MAX_COL; j=j+1)
-			if(game_table[0][j] != `empty)
-				flag3 = 1'b1;	
-				
-		for(i=0; i<n && i<`MAX_ROW; i=i+1)
-			if(game_table[i][0] != `empty)
-				flag4 = 1'b1;	
-				
-		// All of this 4 functions for first move and one of them for other moves
-		if(flag1 == 1'b1)
-			n = n+1;
-		
-		if(flag2 == 1'b1)
-			m = m+1; 
-		
-		if(flag3 == 1'b1)
-			shift_down();
-			
-		if(flag4 == 1'b1)
-			shift_right();	
-		
-		if(n > `MAX_ROW)
-			n = `MAX_ROW;
-			
-		if(m > `MAX_COL)
-			m = `MAX_COL;
-			
-		// now game_table is updated and n & m are updated too. 					
-	end
-	endtask
-	
-	task shift_down();
-	integer i, j;
-	begin
-		for(i=`MAX_ROW-2; i>=0; i=i-1)
-			for(j=0; j<m && j<`MAX_COL; j=j+1)
-				if(i < `MAX_ROW && j < `MAX_COL)
-					game_table[i+1][j] = game_table[i][j]; 
-				
-		for(j=0; j<m && j<`MAX_COL; j=j+1)
-			game_table[0][j] = `empty;
-			
-		n = n+1;
-	end
-	endtask
-	
-	task shift_right();
-	integer i, j;
-	begin
-		for(i=0; i<n && i<`MAX_ROW; i=i+1)
-			for(j=`MAX_COL-2; j>=0; j=j-1)
-				if(i < `MAX_ROW && j < `MAX_COL)
-					game_table[i][j+1] = game_table[i][j];
-				
-		for(i=0; i<n && i<`MAX_ROW; i=i+1)
-			game_table[i][0] = `empty; 
-			
-		m = m+1;
-	end
-	endtask	
-	
-	task updateCopyMap(input[21:0] move);
-	integer r, c;
-	integer i, j;
-	begin
-		
-	
-		for(i=0; i<n && i<`MAX_ROW; i=i+1)
-			for(j=0; j<m && j<`MAX_COL; j=j+1)
+
+/*	generate
+		for(i=0;i<`MAX_ROW;i=i+1) begin
+			for(j=0;j<`MAX_COL;j=j+1) begin
+		  		game_table[i][j] <= `empty;
+				game_table_copy[i][j] <= `empty;
+			end
+	  	end
+	endgenerate	
+
+	generate
+		for(i=0;i<`MAX_VALID_MOVES;i=i+1) begin
+		  	valid_moves[i] <= 21'b0;
+	  	end
+	endgenerate
+*/
+
+	always @(posedge clk) begin
+		if (reset) begin
+			auto_complete_sig <= 1'b0;
+			choose_move_sig <= 1'b0;
+			update_copy_map_sig <= 1'b0;
+			copy_to_map_sig <= 1'b0;
+
+			prev_end_receive <= 1'b0;
+			next_end_receive <= 1'b0;
+
+			auto_complete_sig_done <= 1'b0;
+			choose_move_sig_done <= 1'b0;
+			update_copy_map_sig_done <= 1'b0;
+			copy_to_map_sig_done <= 1'b0;
+
+			work_step_done <= 1'b1;
+			is_table_changed <= 1'b0;
+
+			move_in <= 22'b0;
+			start_transmit <= 1'b0;
+			for(i=0;i<`MAX_ROW;i=i+1) begin
+				 for(j=0;j<`MAX_COL;j=j+1) begin
+			  		game_table[i][j] <= `empty;
+					game_table_copy[i][j] <= `empty;
+				end
+		  	end
+		  	for(i=0;i<`MAX_VALID_MOVES;i=i+1) begin
+			  	valid_moves[i] <= 22'b0;
+		  	end
+		  	step <= 0;
+		  	m <= 1;
+		  	k <= 0;
+		  	round <= 0;
+		  	n <= 1;
+		  	i = 0;
+		  	j = -1;
+		  	r = 0;
+		  	c = -1;
+		end
+		else if (auto_complete_sig) begin
+			if (i <= n - 1 && j < m - 1) begin
+				j = j + 1;
+				auto_complete_up_cell = (i > 0) ? game_table_copy[i - 1][j] : 3'b000;
+				auto_complete_right_cell = (j <= m - 2) ? game_table_copy[i][j + 1] : 3'b000;
+				auto_complete_down_cell = (i <= n - 2) ? game_table_copy[i + 1][j] : 3'b000;
+				auto_complete_left_cell = (j > 0) ? game_table_copy[i][j - 1] : 3'b000;
+			end
+			else if (i <= n - 2 && j >= m - 1) begin
+				i = i + 1;
+				j = 0;
+				auto_complete_up_cell = (i > 0) ? game_table_copy[i - 1][j] : 3'b000;
+				auto_complete_right_cell = (j <= m - 2) ? game_table_copy[i][j + 1] : 3'b000;
+				auto_complete_down_cell = (i <= n - 2) ? game_table_copy[i + 1][j] : 3'b000;
+				auto_complete_left_cell = (j > 0) ? game_table_copy[i][j - 1] : 3'b000;
+			end
+			else begin	// Auto Complete is Done!
+				i = 0;
+				j = -1;
+				if (is_table_changed) begin
+					is_table_changed = 1'b0;
+					auto_complete_sig = 1'b1;
+					auto_complete_sig_done = 1'b0;
+					update_copy_map_sig_done = 1'b0;
+				end
+				else begin
+					auto_complete_sig_done = 1'b1;
+					update_copy_map_sig_done = 1'b1;
+					auto_complete_sig = 1'b0;
+				end
+			end
+			if (auto_complete_is_table_changed == 1'b1) begin
+				is_table_changed <= is_table_changed || auto_complete_is_table_changed;
+				game_table_copy[i][j] = auto_complete_out_cell;
+			end
+		end
+		else if (choose_move_sig) begin
+			if (r <= n - 1 && c < m - 1) begin
+				c = c + 1;
+				update_valid_move_curr_cell = game_table[r][c];
+				update_valid_move_up_cell = (r > 0) ? game_table[r - 1][c] : 3'b000;
+				update_valid_move_right_cell = (c <= m - 2) ? game_table[r][c + 1] : 3'b000;
+				update_valid_move_down_cell = (r <= n - 2) ? game_table[r + 1][c] : 3'b000;
+				update_valid_move_left_cell = (c > 0) ? game_table[r][c - 1] : 3'b000;
+			end
+			else if (r <= n - 2 && c >= m - 1) begin
+				r = r + 1;
+				c = 0;
+				update_valid_move_curr_cell = game_table[r][c];				
+				update_valid_move_up_cell = (r > 0) ? game_table[r - 1][c] : 3'b000;
+				update_valid_move_right_cell = (c <= m - 2) ? game_table[r][c + 1] : 3'b000;
+				update_valid_move_down_cell = (r <= n - 2) ? game_table[r + 1][c] : 3'b000;
+				update_valid_move_left_cell = (c > 0) ? game_table[r][c - 1] : 3'b000;
+			end
+			else begin	// Choose Move is Done!
+				r = 0;
+				c = -1;
+				choose_move_sig = 1'b0;
+				choose_move_sig_done = 1'b1;
+			end 
+			if (k != update_valid_move_k) begin
+				if (update_valid_move_0 != 22'b0) begin
+					valid_moves[k] = update_valid_move_0;
+				end
+				if (update_valid_move_1 != 22'b0) begin
+					valid_moves[k+1] = update_valid_move_1;
+				end
+				if (update_valid_move_2 != 22'b0) begin
+					valid_moves[k+2] = update_valid_move_2;
+				end
+				k = update_valid_move_k;
+			end
+		end
+		else if (update_copy_map_sig) begin
+			if (i <= n - 1 && j < m - 1) begin
+				j = j + 1;
 				game_table_copy[i][j] = game_table[i][j];
-				
-					
-		r = move[9:0];
-		c = move[19:10];
-		game_table_copy[r][c][2:1] = move[21:20];
-		
-		
-		// update from up
-		if(r > 0)
-		if(game_table_copy[r-1][c] != `empty)
-		begin
-			if(game_table_copy[r-1][c][2:1] == `plus)
-				game_table_copy[r][c][0] = game_table_copy[r-1][c][0]; 
-			else
-				game_table_copy[r][c][0] = ~game_table_copy[r-1][c][0];
-		end
-		
-		// update from down
-		if(r < n-1 && r < `MAX_ROW-1)
-		if(game_table_copy[r+1][c] != `empty)
-		begin
-			if(game_table_copy[r][c][2:1] == `plus)
-				game_table_copy[r][c][0] = game_table_copy[r+1][c][0];
-			else
-				game_table_copy[r][c][0] = ~game_table_copy[r+1][c][0];
-		end
-		
-		// update from left
-		if(c > 0)
-		if(game_table_copy[r][c-1] != `empty)
-		begin
-			if( (game_table_copy[r][c-1][2:1] != `bslash && game_table_copy[r][c][2:1] != `slash) ||
-				(game_table_copy[r][c-1][2:1] == `bslash && game_table_copy[r][c][2:1] == `slash) )
-				game_table_copy[r][c][0] = game_table_copy[r][c-1][0];
-			else
-				game_table_copy[r][c][0] = ~game_table_copy[r][c-1][0];
-		end
+			end
+			else if (i <= n - 2 && j >= m - 1) begin
+				i = i + 1;
+				j = 0;
+				game_table_copy[i][j] = game_table[i][j];
+			end
+			else begin
+				i = 0;
+				j = -1;
+				r = move[9:0];
+				c = move[19:10];
+				game_table_copy[r][c][2:1] = move[21:20];
 
-		// update from right
-		if(c < m-1 && c < `MAX_COL-1)
-		if(game_table_copy[r][c+1] != `empty)
-		begin
-			if( (game_table_copy[r][c+1][2:1] != `slash && game_table_copy[r][c][2:1] != `bslash) ||
-				(game_table_copy[r][c+1][2:1] == `slash && game_table_copy[r][c][2:1] == `bslash) )
-				game_table_copy[r][c][0] = game_table_copy[r][c+1][0];
-			else
-				game_table_copy[r][c][0] = ~game_table_copy[r][c+1][0];
-		end
-		
-		// first move
-		if(n == 1'b1 && m == 1'b1)
-		begin
-			game_table_copy[r][c][0] = `white;
-		end
-		
-		
-		auto_complete();
-		
-		
-
-	end
-	endtask
-	
-	task auto_complete();
-	integer i, j, cnt;
-	reg[1:0] upcolor, downcolor, rightcolor, leftcolor;
-	reg is_table_changed;
-	begin
-		is_table_changed = 1'b1;
-		
-		while(is_table_changed == 1'b1)
-		begin
-			if (a[0] === 1'bx) a[0] = 1'bx;
-			is_table_changed = 1'b0;
-			for(i=0; i<n && i<`MAX_ROW; i=i+1)
-			begin
-				for(j=0; j<m && j<`MAX_COL; j=j+1)
-				begin
-					if(game_table_copy[i][j] == `empty)
-					begin
-						
-						cnt = 3'b0;
-						upcolor = `nocolor;
-						downcolor = `nocolor;
-						rightcolor = `nocolor;
-						leftcolor = `nocolor;
-					
-						if(i > 0) 
-						if(game_table_copy[i-1][j] != `empty)
-						begin
-							cnt = cnt + 1;
-							if(game_table_copy[i-1][j][2:1] == `plus)
-								upcolor = {1'b0, game_table_copy[i-1][j][0]};
-							else
-								upcolor = {1'b0, ~game_table_copy[i-1][j][0]};
-						end	
-							
-					
-						if(i < n-1 && i<`MAX_ROW-1)
-						if(game_table_copy[i+1][j] != `empty)
-						begin
-							cnt = cnt + 1;
-							downcolor = {1'b0, game_table_copy[i+1][j][0]};
-						end	
-					
-						if(j > 0)
-						if(game_table_copy[i][j-1] != `empty)
-						begin
-							cnt = cnt + 1;
-							if(game_table_copy[i][j-1][2:1] == `bslash)
-								leftcolor = {1'b0, game_table_copy[i][j-1][0]};
-							else
-								leftcolor = {1'b0, ~game_table_copy[i][j-1][0]};
-						end				
-						
-						if(j < m-1 && j < `MAX_COL-1)
-						if(game_table_copy[i][j+1] != `empty)
-						begin
-							cnt = cnt + 1;
-							if(game_table_copy[i][j+1][2:1] == `slash)
-								rightcolor = {1'b0, game_table_copy[i][j+1][0]};
-							else
-								rightcolor = {1'b0, ~game_table_copy[i][j+1][0]};
-						end		
-						
-						// now cnt is the number of non empty adjacent cells
-						
-						if(cnt == 3'd2)
-						begin
-							if(upcolor != `nocolor)
-							begin
-								if(upcolor == rightcolor)
-								begin
-									game_table_copy[i][j] = {`bslash, upcolor[0]};
-									is_table_changed = 1'b1;
-								end
-								
-								if(upcolor == downcolor)
-								begin
-									game_table_copy[i][j] = {`plus, upcolor[0]};
-									is_table_changed = 1'b1;
-								end	
-								
-								if(upcolor == leftcolor)
-								begin
-									game_table_copy[i][j] = {`slash, upcolor[0]};
-									is_table_changed = 1'b1;
-								end
-							end
-							else if(rightcolor != `nocolor)
-							begin
-								if(rightcolor == downcolor)
-								begin
-									game_table_copy[i][j] = {`slash, ~rightcolor[0]};
-									is_table_changed = 1'b1;
-								end
-								
-								if(rightcolor == leftcolor)
-								begin
-									game_table_copy[i][j] = {`plus, ~rightcolor[0]};
-									is_table_changed = 1'b1;
-								end	
-							end
-							else
-							begin
-								if(downcolor == leftcolor)
-								begin
-									game_table_copy[i][j] = {`bslash, ~downcolor[0]};
-									is_table_changed = 1'b1;
-								end	
-							end
-						end
+				// update from up
+				if (r > 0) begin
+					if (game_table_copy[r-1][c] != `empty) begin
+						if(game_table_copy[r-1][c][2:1] == `plus)
+							game_table_copy[r][c][0] = game_table_copy[r-1][c][0]; 
+						else
+							game_table_copy[r][c][0] = ~game_table_copy[r-1][c][0];
 					end
-				end	
-			end
-		end
-					
-	end
-	endtask
-	
-	task chooseFirstMove(output[21:0] move); 
-	begin
-		k = 2;
-		valid_moves[0] = {`plus, 10'b0, 10'b0 };
-		valid_moves[1] = {`slash, 10'b0, 10'b0 };
-		move = valid_moves[0];
-	end
-	endtask
-	
-	task chooseMove(output[21:0] move);
-	integer i, j, l;
-	reg wc, wp, bc, bp;
-	reg pri1, pri2, pri3;
-	begin
-		k = 0;
-		for(i=0; i<n && i<`MAX_ROW; i=i+1)
-			for(j=0; j<m && j<`MAX_COL; j=j+1)
+				end
+				// update from down
+				if(r < n-1 && r < `MAX_ROW-1) begin
+					if(game_table_copy[r+1][c] != `empty) begin
+						if(game_table_copy[r][c][2:1] == `plus)
+							game_table_copy[r][c][0] = game_table_copy[r+1][c][0];
+						else
+							game_table_copy[r][c][0] = ~game_table_copy[r+1][c][0];
+					end
+				end
 				
-				if(game_table[i][j] != `empty)
-					update_valid_moves(i, j);
-				
-		// now valid_moves is updated
-	/*	
-		pri1 = 1'b0;
-		pri2 = 1'b0;
-		pri3 = 1'b0;
-		
-		for(l=0; l<k; l=l+1)
-		begin
-			updateCopyMap(valid_moves[l]);
-			white_cycle(wc);
-			white_path(wp);
-			black_cycle(bc);
-			black_path(bp);
-			if( (color == `white) && (wc == 1'b1 || wp == 1'b1) )
-				pri1 = 1'b1;
-			if( (color == `black) && (bc == 1'b1 || bp == 1'b1) )
-				pri1 = 1'b1;	
-			if( (color == `white) && (bc == 1'b1 || bp == 1'b1) )
-				pri2 = 1'b1;
-			if( (color == `black) && (wc == 1'b1 || wp == 1'b1) )
-				pri2 = 1'b1;
-				
-			// priority 3 must be completed !!
-		end
-	*/	
-		
-		// choosing move based on priority in phase3 !!
-		
-		// in phase2 :
-		move = valid_moves[0];
-				
-	end
-	endtask
-	
-	task white_cycle(output yes);
-	  begin
-	    end
-	endtask
-	
-	task black_cycle(output yes);
-	  begin
-	    end
-	endtask
-	
-	task white_path(output yes);
-	  begin
-	    end
-	endtask
-	
-	task black_path(output yes);
-	  begin
-	    end
-	endtask
-	
-	task update_valid_moves(input r, c);
-	integer cnt;
-	reg up, down, left, right;
-	reg[10-1:0] mraw, mcol; 
-	begin
-		cnt = 3'b0;
-		up = 1'b0;
-		down = 1'b0;
-		left = 1'b0;
-		right = 1'b0;
+				// update from left
+				if(c > 0) begin
+					if(game_table_copy[r][c-1] != `empty) begin
+						if( (game_table_copy[r][c-1][2:1] != `bslash && game_table_copy[r][c][2:1] != `slash) ||
+							(game_table_copy[r][c-1][2:1] == `bslash && game_table_copy[r][c][2:1] == `slash) )
+							game_table_copy[r][c][0] = game_table_copy[r][c-1][0];
+						else
+							game_table_copy[r][c][0] = ~game_table_copy[r][c-1][0];
+					end
+				end
 
-		mraw = r;
-		mcol = c;
-		
-		if(r > 0) 
-		if(game_table[r-1][c] != `empty)
-		begin
-			cnt = cnt + 1;
-			up = 1'b1;				
-		end	
-							
+				// update from right
+				if(c < m-1 && c < `MAX_COL-1) begin
+					if(game_table_copy[r][c+1] != `empty) begin
+						if( (game_table_copy[r][c+1][2:1] != `slash && game_table_copy[r][c][2:1] != `bslash) ||
+							(game_table_copy[r][c+1][2:1] == `slash && game_table_copy[r][c][2:1] == `bslash) )
+							game_table_copy[r][c][0] = game_table_copy[r][c+1][0];
+						else
+							game_table_copy[r][c][0] = ~game_table_copy[r][c+1][0];
+					end
+				end
+				
+				// first move
+				if(n == 1'b1 && m == 1'b1) begin
+					game_table_copy[r][c][0] = `white;
+				end
+
+				update_copy_map_sig = 1'b0;
+				auto_complete_sig = 1'b1;	// Call Auto Complete Function
+				r = 0;
+				c = -1;
+			end
+		end
+		else if (copy_to_map_sig) begin
+		  	if (i <= n - 1 && j < m - 1) begin
+				j = j + 1;
+				game_table[i][j] = game_table_copy[i][j];
+				if (n < `MAX_ROW)
+					if(game_table_copy[n-1][j] != `empty)
+						flag1 = 1'b1;
+				if (m < `MAX_COL)
+					if(game_table_copy[i][m-1] != `empty)
+						flag2 = 1'b1;	
+				if(game_table_copy[0][j] != `empty)
+					flag3 = 1'b1;
+				if(game_table_copy[i][0] != `empty)
+					flag4 = 1'b1;	
+			end
+			else if (i <= n - 2 && j >= m - 1) begin
+				i = i + 1;
+				j = 0;
+				game_table[i][j] = game_table_copy[i][j];
+				if (n < `MAX_ROW)
+					if(game_table_copy[n-1][j] != `empty)
+						flag1 = 1'b1;
+				if (m < `MAX_COL)
+					if(game_table_copy[i][m-1] != `empty)
+						flag2 = 1'b1;	
+				if(game_table_copy[0][j] != `empty)
+					flag3 = 1'b1;	
+				if(game_table_copy[i][0] != `empty)
+					flag4 = 1'b1;	
+			end
+			else begin
+				i = 0;
+				j = -1;
+				// All of this 4 functions for first move and one of them for other moves
+				if(flag1 == 1'b1)
+					n = n + 1'b1;
+				
+				if(flag2 == 1'b1)
+					m = m + 1'b1;
+				
+				if(flag3 == 1'b1) begin			// Shift Down
+					shift_down_i = n - 2;
+					shift_down_j = -1;
+					shift_down_sig = 1'b1;
+				end
+				if(flag4 == 1'b1) begin			// Shift Right
+					shift_right_i = 0;
+					shift_right_j = m - 1;
+					shift_right_sig = 1'b1;
+				end
+				if(n > `MAX_ROW)
+					n = `MAX_ROW;
 					
-		if(r < n-1 && r < `MAX_ROW-1)
-		if(game_table[r+1][c] != `empty)
-		begin
-			cnt = cnt + 1;
-			down = 1'b1;
-		end	
-					
-		if(c > 0)
-		if(game_table[r][c-1] != `empty)
-		begin
-			cnt = cnt + 1;
-			left = 1'b1;
-		end				
-						
-		if(c < m-1 && c<`MAX_COL-1)
-		if(game_table[r][c+1] != `empty)
-		begin
-			cnt = cnt + 1;
-			right = 1'b1;
+				if(m > `MAX_COL)
+					m = `MAX_COL;
+			end	
+			copy_to_map_sig = 1'b0;
+			copy_to_map_sig_done = 1'b1;
+			// now game_table is updated and n & m are updated too. 					
 		end
-		
-		// now cnt is the number of non empty adjacent cells
-		
-		if(cnt == 3'd1)
-		begin
-			valid_moves[k] = {`plus, mcol, mraw}; 
-			valid_moves[k+1] = {`slash, mcol, mraw};
-			valid_moves[k+2] = {`bslash, mcol, mraw};
-			k = k+3;
-		end
-		
-		if(cnt == 3'd2)
-		begin
-			if(up == 1'b1)
-			begin
-				if(right == 1'b1)
-				begin
-					valid_moves[k] = {`plus, mcol, mraw}; 
-					valid_moves[k+1] = {`slash, mcol, mraw};
-					k = k+2;
-				end
-				else if(down == 1'b1)
-				begin
-					valid_moves[k] = {`bslash, mcol, mraw}; 
-					valid_moves[k+1] = {`slash, mcol, mraw};
-					k = k+2;
-				end
-				else if(left == 1'b1)
-				begin
-					valid_moves[k] = {`plus, mcol, mraw}; 
-					valid_moves[k+1] = {`bslash, mcol, mraw};
-					k = k+2;
+		else if (shift_down_sig) begin
+			if (shift_down_i >= 0 && shift_down_j < m - 1) begin
+				shift_down_j = shift_down_j + 1;
+				if(shift_down_i < n - 1 && shift_down_j < m) begin
+					game_table[shift_down_i + 1][shift_down_j] = game_table[shift_down_i][shift_down_j];
 				end
 			end
-			else if(right == 1'b1)
-			begin
-				if(down == 1'b1)
-				begin
-					valid_moves[k] = {`plus, mcol, mraw}; 
-					valid_moves[k+1] = {`bslash, mcol, mraw};
-					k = k+2;
+			else if (shift_down_i > 0 && shift_down_j >= m - 1) begin
+				shift_down_i = shift_down_i - 1;
+				shift_down_j = 0;
+				if(shift_down_i < n - 1 && shift_down_j < m) begin
+					game_table[shift_down_i + 1][shift_down_j] = game_table[shift_down_i][shift_down_j];
 				end
-				else if(left == 1'b1)
-				begin
-					valid_moves[k] = {`bslash, mcol, mraw}; 
-					valid_moves[k+1] = {`slash, mcol, mraw};
-					k = k+2;
-				end
+				j = -1;
 			end
-			else
-			begin
-				valid_moves[k] = {`plus, mcol, mraw}; 
-				valid_moves[k+1] = {`slash, mcol, mraw};
-				k = k+2;
+			else begin
+				if (j <= m - 1) begin
+					j = j + 1;
+					game_table[0][j] = `empty;
+				end
+				else begin
+					j = -1;
+					n = n + 1'b1;
+					shift_down_sig = 1'b0;
+					shift_down_sig_done = 1'b1;
+				end
 			end
 		end
+		else if (shift_right_sig) begin
+			if (shift_right_i <= n - 1 && shift_right_j >= 1) begin
+				shift_right_j = shift_right_j - 1;
+				if(shift_right_i < n && shift_right_j < m - 1 && shift_right_j >= 0) begin
+					game_table[shift_right_i][shift_right_j + 1] = game_table[shift_right_i][shift_right_j];
+				end
+			end
+			else if (shift_right_i < n - 1 && shift_right_j < 0) begin
+				shift_right_i = shift_right_i + 1;
+				shift_right_j = m - 2;
+				if(shift_right_i < n && shift_right_j < m - 1) begin
+					game_table[shift_right_i][shift_right_j+1] = game_table[shift_right_i][shift_right_j];
+				end
+				i = -1;
+			end
+			else begin
+				if (i < n - 1) begin
+					i = i + 1;
+					game_table[i][0] <= `empty;
+				end
+				else begin
+					m = m + 1'b1;
+					shift_right_sig = 1'b0;
+					shift_right_sig_done = 1'b1;
+				end
+			end
+		end
+		else begin
+			prev_end_receive <= next_end_receive;
+			next_end_receive <= end_receive;
 		
+			if (start_transmit == 1'b1) begin
+				start_transmit <= 1'b0;
+			end
+			if (prev_end_receive == 0 && next_end_receive == 1) begin
+				round = round + 1;
+				move <= move_out;
+				if (round == 1'b1) begin
+					if(color == `white) begin
+						k = 2;
+						valid_moves[0] = {`plus, 10'b0, 10'b0 };
+						valid_moves[1] = {`slash, 10'b0, 10'b0 };
+						move_in = valid_moves[0];
+						move <= move_in;
+					 	update_copy_map_sig <= 1'b1;
+					 	copy_to_map_sig <= 1'b1;
+					 	start_transmit <= 1'b1;
+				 	end  
+				end
+				else begin
+					work_step_done <= 1'b1;
+				end
+			end
+			else if (~(prev_end_receive == 0 && next_end_receive == 1) && work_step_done == 1'b0) begin // Data Received!
+				if (step == 0) begin
+					move <= move_out;
+					update_copy_map_sig <= 1'b1;
+					step = step + 1;
+				end
+				else if (step == 1 && update_copy_map_sig_done) begin
+					update_copy_map_sig_done <= 1'b0;
+					copy_to_map_sig <= 1'b1;
+					flag1 = 1'b0;
+					flag2 = 1'b0;
+		  			flag3 = 1'b0;
+				  	flag4 = 1'b0;
+					step = step + 1;
+				end
+				else if (step == 2 && copy_to_map_sig_done) begin
+					copy_to_map_sig_done <= 1'b0;
+					choose_move_sig <= 1'b1;
+					r = 0;
+					c = -1;
+					step = step + 1;
+				end
+				else if (step == 3 && choose_move_sig_done) begin
+					choose_move_sig_done <= 1'b0;
+					move = valid_moves[0];
+					update_copy_map_sig <= 1'b1;
+					step = step + 1;
+				end
+				else if (step == 4 && update_copy_map_sig_done) begin
+					update_copy_map_sig_done = 1'b0;
+					copy_to_map_sig = 1'b1;
+					flag1 = 1'b0;
+					flag2 = 1'b0;
+		  			flag3 = 1'b0;
+				  	flag4 = 1'b0;
+					step = step + 1;
+				end
+				else begin
+					copy_to_map_sig_done <= 1'b0;
+					start_transmit <= 1'b1;
+					work_step_done <= 1'b1;
+					step = 0;
+				end
+			end
+			else begin
+				//$display("We Are DEAD!!");
+			end
+		end
 	end
-	endtask
-	
-	  
 endmodule
