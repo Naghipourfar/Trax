@@ -273,7 +273,7 @@ module Trax(output tx, input rx, clk, reset);
 				if(game_table_copy[i][0] != `empty)
 					flag4 = 1'b1;	
 			end
-			else if (i <= n - 1 && j >= m - 1) begin
+			else if (i <= n - 2 && j >= m - 1) begin
 				i = i + 1;
 				j = 0;
 				game_table[i][j] = game_table_copy[i][j];
@@ -296,7 +296,7 @@ module Trax(output tx, input rx, clk, reset);
 					n = n + 1'b1;
 				
 				if(flag2 == 1'b1)
-					m = m + 1'b1; 
+					m = m + 1'b1;
 				
 				if(flag3 == 1'b1) begin			// Shift Down
 					shift_down_i = n - 2;
@@ -321,15 +321,15 @@ module Trax(output tx, input rx, clk, reset);
 		else if (shift_down_sig) begin
 			if (shift_down_i >= 0 && shift_down_j < m - 1) begin
 				shift_down_j = shift_down_j + 1;
-				if(shift_down_i < n && shift_down_j < m) begin
-					game_table[shift_down_i+1][shift_down_j] = game_table[shift_down_i][shift_down_j];
+				if(shift_down_i < n - 1 && shift_down_j < m) begin
+					game_table[shift_down_i + 1][shift_down_j] = game_table[shift_down_i][shift_down_j];
 				end
 			end
-			else if (shift_down_i >= 0 && shift_down_j >= m - 1) begin
+			else if (shift_down_i > 0 && shift_down_j >= m - 1) begin
 				shift_down_i = shift_down_i - 1;
 				shift_down_j = 0;
-				if(shift_down_i < n && shift_down_j < m && shift_down_i >= 0) begin
-					game_table[shift_down_i+1][shift_down_j] = game_table[shift_down_i][shift_down_j];
+				if(shift_down_i < n - 1 && shift_down_j < m) begin
+					game_table[shift_down_i + 1][shift_down_j] = game_table[shift_down_i][shift_down_j];
 				end
 				j = -1;
 			end
@@ -339,6 +339,7 @@ module Trax(output tx, input rx, clk, reset);
 					game_table[0][j] = `empty;
 				end
 				else begin
+					j = -1;
 					n = n + 1'b1;
 					shift_down_sig = 1'b0;
 					shift_down_sig_done = 1'b1;
@@ -346,26 +347,26 @@ module Trax(output tx, input rx, clk, reset);
 			end
 		end
 		else if (shift_right_sig) begin
-			if (shift_right_i <= n - 1 && shift_right_j >= 0) begin
+			if (shift_right_i <= n - 1 && shift_right_j >= 1) begin
 				shift_right_j = shift_right_j - 1;
-				if(shift_right_i < n && shift_right_j < m && shift_right_j >= 0) begin
-					game_table[shift_right_i][shift_right_j+1] = game_table[shift_right_i][shift_right_j];
+				if(shift_right_i < n && shift_right_j < m - 1 && shift_right_j >= 0) begin
+					game_table[shift_right_i][shift_right_j + 1] = game_table[shift_right_i][shift_right_j];
 				end
 			end
-			else if (shift_right_i <= n - 1 && shift_right_j < 0) begin
+			else if (shift_right_i < n - 1 && shift_right_j < 0) begin
 				shift_right_i = shift_right_i + 1;
-				shift_right_j = m - 1;
-				if(shift_right_i < n && shift_right_j < m) begin
+				shift_right_j = m - 2;
+				if(shift_right_i < n && shift_right_j < m - 1) begin
 					game_table[shift_right_i][shift_right_j+1] = game_table[shift_right_i][shift_right_j];
 				end
 				i = -1;
 			end
 			else begin
-				if (i <= n - 1) begin
+				if (i < n - 1) begin
 					i = i + 1;
 					game_table[i][0] <= `empty;
 				end
-				else begin 
+				else begin
 					m = m + 1'b1;
 					shift_right_sig = 1'b0;
 					shift_right_sig_done = 1'b1;
