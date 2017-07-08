@@ -1,5 +1,5 @@
-`define MAX_ROW 10'd50
-`define MAX_COL 10'd50
+`define MAX_ROW 10'd20
+`define MAX_COL 10'd20
 `define MAX_VALID_MOVES 203
 `define empty 3'b000
 `define nocolor 2'b11
@@ -31,18 +31,13 @@ module AutoComplete(output reg is_table_changed, output reg[2:0] out_cell, input
 			rightcolor <= `nocolor;
 			leftcolor <= `nocolor;
 			is_table_changed <= 1'b0;
-			if(i > 0) begin
-				if(down_cell != `empty) begin
-					cnt = cnt + 1'b1;
-					if (down_cell[2:1] == `plus)
-						upcolor <= {1'b0, down_cell[0]};
-					else
-						upcolor <= {1'b0, ~down_cell[0]};
-				end
-				else begin
-					cnt = cnt + 1'b0;
-					upcolor <= `nocolor;
-				end
+
+			if(up_cell != `empty) begin
+				cnt = cnt + 1'b1;
+				if (up_cell[2:1] == `plus)
+					upcolor <= {1'b0, up_cell[0]};
+				else
+					upcolor <= {1'b0, ~up_cell[0]};
 			end
 			else begin
 				cnt = cnt + 1'b0;
@@ -50,51 +45,33 @@ module AutoComplete(output reg is_table_changed, output reg[2:0] out_cell, input
 			end
 				
 		
-			if(i < n-1 && i<`MAX_ROW-1) begin
-				if(up_cell != `empty) begin
-					cnt = cnt + 1'b1;
-					downcolor <= {1'b0, up_cell[0]};
-				end
-				else begin
-					cnt = cnt + 1'b0;
-					downcolor <= `nocolor;
-				end
+			if(down_cell != `empty) begin
+				cnt = cnt + 1'b1;
+				downcolor <= {1'b0, down_cell[0]};
 			end
 			else begin
 				cnt = cnt + 1'b0;
 				downcolor <= `nocolor;
 			end
-		
-			if(j > 0) begin
-				if(left_cell != `empty) begin
-					cnt = cnt + 1'b1;
-					if(left_cell[2:1] == `bslash)
-						leftcolor <= {1'b0, left_cell[0]};
-					else
-						leftcolor <= {1'b0, ~left_cell[0]};
-				end
-				else begin
-					cnt = cnt + 1'b0;
-					leftcolor <= `nocolor;
-				end
+	
+			if(left_cell != `empty) begin
+				cnt = cnt + 1'b1;
+				if(left_cell[2:1] == `bslash)
+					leftcolor <= {1'b0, left_cell[0]};
+				else
+					leftcolor <= {1'b0, ~left_cell[0]};
 			end
-			begin
+			else begin
 				cnt = cnt + 1'b0;
 				leftcolor <= `nocolor;
-			end		
-			
-			if(j < m-1 && j < `MAX_COL-1) begin
-				if(right_cell != `empty) begin
-					cnt = cnt + 1'b1;
-					if(right_cell[2:1] == `slash)
-						rightcolor <= {1'b0, right_cell[0]};
-					else
-						rightcolor <= {1'b0, ~right_cell[0]};
-				end	
-				else begin
-					cnt = cnt + 1'b0;
-					rightcolor <= `nocolor;
-				end
+			end	
+		
+			if(right_cell != `empty) begin
+				cnt = cnt + 1'b1;
+				if(right_cell[2:1] == `slash)
+					rightcolor <= {1'b0, right_cell[0]};
+				else
+					rightcolor <= {1'b0, ~right_cell[0]};
 			end	
 			else begin
 				cnt = cnt + 1'b0;
@@ -103,7 +80,7 @@ module AutoComplete(output reg is_table_changed, output reg[2:0] out_cell, input
 			
 			// now cnt is the number of non empty adjacent cells
 			
-			if(cnt == 3'd2) begin
+			if(cnt >= 3'd2) begin
 				if(upcolor != `nocolor) begin
 					if(upcolor == rightcolor) begin
 						out_cell <= {`bslash, upcolor[0]};
