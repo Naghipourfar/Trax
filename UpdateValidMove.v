@@ -11,7 +11,7 @@
 
 
 
-module UpdateValidMove(output reg[21:0] valid_moves_0, valid_moves_1, valid_moves_2, output reg [8-1:0] k, input[2:0] up_cell, right_cell, down_cell, left_cell, curr_cell input[9:0] r, c, input [8-1:0] k_in, input [9:0] m, n);
+module UpdateValidMove(output reg[21:0] valid_moves_0, valid_moves_1, valid_moves_2, output reg [8-1:0] k, input[2:0] up_cell, right_cell, down_cell, left_cell, curr_cell, input[9:0] r, c, input [8-1:0] k_in, input [9:0] m, n);
 	parameter integer MAX_K_BITS = 8;
 	integer cnt;
 	reg up, down, left, right;
