@@ -90,9 +90,6 @@ module Trax(output tx, input rx, clk, reset);
 			update_copy_map_sig <= 1'b0;
 			copy_to_map_sig <= 1'b0;
 
-			prev_end_receive <= 1'b0;
-			next_end_receive <= 1'b0;
-
 			auto_complete_sig_done <= 1'b0;
 			choose_move_sig_done <= 1'b0;
 			update_copy_map_sig_done <= 1'b0;
