@@ -10,8 +10,8 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 	wire tx_done, rx_finish;
 	wire [7:0] rx_data;
 	reg [7:0] tx_data;
-	reg [15:0] col_data;
-	reg [23:0] row_data;
+	reg [15:0] col_data_rec, col_data_send;
+	reg [23:0] row_data_rec, row_data_send;
 	reg [7:0] move_type;
 	reg start_send;
 	reg prev_tx;
@@ -31,7 +31,10 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 	reg start;
 	parameter clk_rate = 9.6 * (10 ** 6);
 	parameter baud_rate = 9600;
-	localparam integer time_unit = (clk_rate / baud_rate);
+	parameter integer time_unit = (clk_rate / baud_rate);
+	integer time_transmit = 10 * time_unit;
+	defparam uart.clk_rate = clk_rate;
+	defparam uart.baud_rate = baud_rate;
 	Uart uart(tx, tx_done, rx_finish, rx_data, tx_data, rx, clock, reset, start_send);
 	
 	
@@ -76,14 +79,13 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 			end_send <= 1'b1;
 			prev_tx <= 1'b1;
 			start_send <= 1'b0;
-			color_flag <= 1'b0;
 		end
 	  	else if (end_send && !start) begin
 	    	clk_counter = 0;
 	  	end
 	  	else if (!calculated_data && start) begin
-		  	row_data <= calculate_row_vector(move_in[2+:10]);
-		  	col_data <= calculate_col_vector(move_in[12+:10]);
+		  	row_data_send <= calculate_row_vector(move_in[2+:10]);
+		  	col_data_send <= calculate_col_vector(move_in[12+:10]);
 		  	case(move_in[0+:2])
 				2'b00: move_type <= 43;
 				2'b01: move_type <= 92;
@@ -94,15 +96,15 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 		end
 		// Sending Data
 		// Sending Column Data
-		else if (!col_flag && col_data[8] !==1'bx && start) begin
+		else if (!col_flag && col_data_send[8] !==1'bx && start) begin
 		  	if(send_col_counter == 0) begin
-				tx_data <= col_data[8+:8];
+				tx_data <= col_data_send[8+:8];
 				send_col_counter <= send_col_counter + 1;
 				start_send <= 1'b1;
 				clk_counter <= 0;
 			end
-			else if (clk_counter >= 10 * time_unit + 1 && send_col_counter == 1) begin
-				tx_data <= col_data[0+:8];
+			else if (clk_counter >= 100 + 5 && send_col_counter == 1) begin
+				tx_data <= col_data_send[0+:8];
 				start_send <= 1'b1;
 				send_col_counter <= send_col_counter + 1;
 				clk_counter <= 0; 
@@ -116,7 +118,7 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 		end
 		else if(!col_flag && start) begin
 			if(send_col_counter == 0) begin
-				tx_data <= col_data[0+:8];	
+				tx_data <= col_data_send[0+:8];	
 				start_send <= 1'b1;
 				send_col_counter <= send_col_counter + 1;
 				clk_counter <= 0;
@@ -130,20 +132,20 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 		end
 		// Sending Column Data Finished
 		// Sending Row Data
-	  	else if (col_flag && !row_flag && row_data[16] !== 1'bx && start) begin
+	  	else if (col_flag && !row_flag && row_data_send[16] !== 1'bx && start) begin
 		  	if (send_row_counter == 0) begin
-				tx_data <= row_data[16+:8];
+				tx_data <= row_data_send[16+:8];
 				start_send <= 1'b1;
 				send_row_counter <= send_row_counter + 1;
 			end
-			else if (clk_counter >= (10 * time_unit) + 5 && send_row_counter == 1) begin
-				tx_data <= row_data[8+:8];
+			else if (clk_counter >= time_transmit && send_row_counter == 1) begin
+				tx_data <= row_data_send[8+:8];
 				start_send = 1'b1;
 				send_row_counter <= send_row_counter + 1;
 				clk_counter <= 0;
 			end
-			else if (clk_counter >= (10 * time_unit) + 5 && send_row_counter == 2) begin
-				tx_data <= row_data[0+:8];
+			else if (clk_counter >= time_transmit && send_row_counter == 2) begin
+				tx_data <= row_data_send[0+:8];
 				start_send <= 1'b1;
 				send_row_counter <= send_row_counter + 1;
 				clk_counter <= 0;
@@ -155,15 +157,15 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 					row_flag <= 1'b1;
 			end
 		end
-		else if(col_flag && !row_flag && row_data[8] !== 1'bx && start) begin
+		else if(col_flag && !row_flag && row_data_send[8] !== 1'bx && start) begin
 		  	if (send_row_counter == 0) begin
-				tx_data <= row_data[8+:8];
+				tx_data <= row_data_send[8+:8];
 				start_send <= 1'b1;
 				send_row_counter <= send_row_counter + 1;
 				clk_counter <= 0;
 			end
-			else if ((clk_counter >= 105) && (send_row_counter == 1)) begin
-				tx_data <= row_data[0+:8];
+			else if ((clk_counter >= time_transmit) && (send_row_counter == 1)) begin
+				tx_data <= row_data_send[0+:8];
 				start_send <= 1'b1;
 				send_row_counter <= send_row_counter + 1;
 				clk_counter <= 0;
@@ -177,7 +179,7 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 		end
 		else if(col_flag && !row_flag && start) begin
 		  	if (send_row_counter == 0) begin
-				tx_data <= row_data[0+:8];
+				tx_data <= row_data_send[0+:8];
 				start_send <= 1'b1;
 				send_row_counter <= send_row_counter + 1;
 				clk_counter <= 0;
@@ -286,7 +288,10 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 	end
 
 	always @(negedge clock) begin
-		if (rx_finish && !start) begin
+		if (reset) begin
+			color_flag <= 1'b0;
+		end
+		else if (rx_finish && !start) begin
 			if (!color_flag) begin // 45 = '-' ASCII Code (Means that the color is sending)
 				if (rx_data == 87) begin // 87 is 'W'
 			 		color <= 1'b0;
@@ -298,29 +303,29 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 				end
 	 		end
 			else if (color_flag && rx_data > 63 & rx_data < 91) begin // if rx_data is an English Literal --> Column Data
-				if(col_data[0] == 1'bx) begin
+				if(col_data_rec[0] == 1'bx) begin
 					end_receive <= 1'b0;
-					col_data[7:0] <= rx_data;
+					col_data_rec[7:0] <= rx_data;
 				end
 				else begin
-					col_data[8+:8] <= col_data[0+:8];
-					col_data[0+:8] <= rx_data;
+					col_data_rec[8+:8] <= col_data_rec[0+:8];
+					col_data_rec[0+:8] <= rx_data;
 				end
-				move_out[2+:10] <= calculate_col_number(col_data);
+				move_out[2+:10] <= calculate_col_number(col_data_rec);
 			end
 			else if (rx_data > 47 & rx_data < 58) begin // if rx_data is a number --> Row Data
-				if(row_data[0] == 1'bx) 
-					row_data[0+:8] <= rx_data;
-				else if (row_data[8] == 1'bx) begin
-					row_data[8+:8] <= row_data[0+:8];
-					row_data[0+:8] <= rx_data;
+				if(row_data_rec[0] == 1'bx) 
+					row_data_rec[0+:8] <= rx_data;
+				else if (row_data_rec[8] == 1'bx) begin
+					row_data_rec[8+:8] <= row_data_rec[0+:8];
+					row_data_rec[0+:8] <= rx_data;
 				end
 				else begin
-					row_data[16+:8] <= row_data[8+:8];
-					row_data[8+:8] <= row_data[0+:8];
-					row_data[0+:8] <= rx_data;
+					row_data_rec[16+:8] <= row_data_rec[8+:8];
+					row_data_rec[8+:8] <= row_data_rec[0+:8];
+					row_data_rec[0+:8] <= rx_data;
 				end
-				move_out[12+:10] <= calculate_row_number(row_data);
+				move_out[12+:10] <= calculate_row_number(row_data_rec);
 			end		
 			else if(rx_data == 43) // plus is received
 				move_out[0+:2] <= 2'b00;
