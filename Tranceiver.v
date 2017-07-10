@@ -87,9 +87,9 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 		  	row_data_send <= calculate_row_vector(move_in[0+:10]);
 		  	col_data_send <= calculate_col_vector(move_in[10+:10]);
 		  	case(move_in[20+:2])
-				2'b00: move_type <= 43;
-				2'b01: move_type <= 92;
-				2'b10: move_type <= 47;
+				2'b01: move_type <= 43;   // plus
+				2'b10: move_type <= 47;   // slash
+				2'b11: move_type <= 92;   // bslash
 		  	endcase
 		  	calculated_data = 1'b1;
 		  	end_send <= 1'b0;
@@ -292,7 +292,7 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 			color_flag <= 1'b0;
 			end_receive <= 1'b1;
 		end
-		else if (rx_finish && !start) begin
+		else if (!prev_rx_finish && rx_finish && !start) begin
 			if (!color_flag) begin // 45 = '-' ASCII Code (Means that the color is sending)
 				if (rx_data == 87) begin // 87 is 'W'
 			 		color <= 1'b0;
@@ -306,38 +306,42 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 				end
 	 		end
 			else if (color_flag && rx_data > 63 & rx_data < 91) begin // if rx_data is an English Literal --> Column Data
-				if(col_data_rec[0] == 1'bx) begin
+				if(col_data_rec[0] === 1'bx) begin
 					end_receive <= 1'b0;
-					col_data_rec[7:0] <= rx_data;
+					col_data_rec[7:0] = rx_data;
+					move_out[10+:10] = calculate_col_number(col_data_rec);
 				end
 				else begin
-					col_data_rec[8+:8] <= col_data_rec[0+:8];
-					col_data_rec[0+:8] <= rx_data;
+					col_data_rec[8+:8] = col_data_rec[0+:8];
+					col_data_rec[0+:8] = rx_data;
+					move_out[10+:10] = calculate_col_number(col_data_rec);
 				end
-				move_out[0+:10] <= calculate_col_number(col_data_rec);
 			end
 			else if (rx_data > 47 & rx_data < 58) begin // if rx_data is a number --> Row Data
-				if(row_data_rec[0] == 1'bx) 
-					row_data_rec[0+:8] <= rx_data;
+				if(row_data_rec[0] === 1'bx) 
+					row_data_rec[0+:8] = rx_data;
 				else if (row_data_rec[8] == 1'bx) begin
-					row_data_rec[8+:8] <= row_data_rec[0+:8];
-					row_data_rec[0+:8] <= rx_data;
+					row_data_rec[8+:8] = row_data_rec[0+:8];
+					row_data_rec[0+:8] = rx_data;
 				end
 				else begin
-					row_data_rec[16+:8] <= row_data_rec[8+:8];
-					row_data_rec[8+:8] <= row_data_rec[0+:8];
-					row_data_rec[0+:8] <= rx_data;
+					row_data_rec[16+:8] = row_data_rec[8+:8];
+					row_data_rec[8+:8] = row_data_rec[0+:8];
+					row_data_rec[0+:8] = rx_data;
 				end
-				move_out[10+:10] <= calculate_row_number(row_data_rec);
+				move_out[0+:10] = calculate_row_number(row_data_rec);
 			end		
 			else if(rx_data == 43) // plus is received
-				move_out[20+:2] <= 2'b00;
-			else if(rx_data == 92) // back slash is received
 				move_out[20+:2] <= 2'b01;
+			else if(rx_data == 92) // back slash is received
+				move_out[20+:2] <= 2'b11;
 			else if(rx_data == 47) // slash is received
 				move_out[20+:2] <= 2'b10;
-			else // Means That \n is received
+			else begin// Means That \n is received
 				end_receive <= 1'b1;
+				col_data_rec = 16'bx;
+				row_data_rec = 24'bx;
+			end
 		end
 	end
 
@@ -423,16 +427,23 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 		integer divide, mod, number;
 		begin
 			number = col_number;
-			if (number % 26 == 0)
-			  divide = (number / 26) - 1;
-			else
-			  divide = number / 26;
+			divide = number / 26;
 			mod = number - (divide * 26);
-			calculate_col_vector[0+:8] = mod + 64;
-			if (divide != 0)
-				calculate_col_vector[8+:8] = divide + 64;
-			else
+			if (number <= 26) begin 
+				calculate_col_vector[0+:8] = number + 64;
 				calculate_col_vector[8+:8] = 8'bx;
+			end
+			else if (mod == 0 && divide != 0) begin
+				divide = divide - 1;
+				calculate_col_vector[8+:8] = divide + 64;
+			end
+			else begin
+				if (divide != 0)
+					calculate_col_vector[8+:8] = divide + 64;
+				else
+					calculate_col_vector[8+:8] = 8'bx;
+				calculate_col_vector[0+:8] = mod + 64;
+			end
 		end
 	endfunction
 	
@@ -469,6 +480,8 @@ module Tranceiver(output reg[21:0] move_out, output reg end_receive, color, outp
 	endfunction	
 		
 endmodule
+
+
 
 
 
