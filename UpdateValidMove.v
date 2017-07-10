@@ -17,7 +17,7 @@ module UpdateValidMove(output reg[21:0] valid_moves_0, valid_moves_1, valid_move
 	reg up, down, left, right;
 	reg [9:0] mrow, mcol;
 
-	always @(*) begin
+	always @(up_cell, right_cell, down_cell, left_cell, curr_cell, r, c) begin
 		cnt = 3'b0;
 		up = 1'b0;
 		down = 1'b0;
@@ -30,8 +30,9 @@ module UpdateValidMove(output reg[21:0] valid_moves_0, valid_moves_1, valid_move
 	 	mrow = r;
 		mcol = c;
 		k = k_in;
-		
-		if (curr_cell != `empty) begin
+
+		$display(" in update valid move !! %b %b ", r, c);		
+		if (curr_cell == `empty) begin
 			if(up_cell != `empty) begin
 				cnt = cnt + 1'b1;
 				up = 1'b1;
@@ -68,6 +69,8 @@ module UpdateValidMove(output reg[21:0] valid_moves_0, valid_moves_1, valid_move
 				cnt = cnt + 1'b0;
 				right = 1'b0;
 			end
+
+			$display(" in update valid move !! %b %b %b", r, c, cnt);
 
 			// now cnt is the number of non empty adjacent cells
 
