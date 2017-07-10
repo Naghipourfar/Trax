@@ -16,7 +16,7 @@ module AutoComplete(output reg is_table_changed, output reg[2:0] out_cell, input
 	integer cnt;
 
 
-	always @(*) begin
+	always @(up_cell, right_cell, down_cell, left_cell, i, j) begin
 		out_cell = curr_cell;
 		cnt = 3'b0;
 		upcolor <= `nocolor;
