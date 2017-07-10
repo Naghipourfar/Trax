@@ -2,8 +2,8 @@
 			   In The Name of God								                  *
  ****************************************************************************/
 
-`define MAX_ROW 10'd5
-`define MAX_COL 10'd5
+`define MAX_ROW 10'd20
+`define MAX_COL 10'd20
 `define MAX_VALID_MOVES 203
 `define empty 3'b000
 `define nocolor 2'b11
@@ -42,10 +42,10 @@ module Trax(output tx, input rx, clk, reset);
 	reg [2:0] game_table_copy[`MAX_ROW - 1:0][`MAX_COL - 1:0];
 	reg [21:0] valid_moves [`MAX_VALID_MOVES - 1:0];
 	wire [21:0] update_valid_move_0, update_valid_move_1, update_valid_move_2;
-	integer i, j;
+	reg signed [31:0] i, j;
 	integer shift_down_i, shift_down_j;
 	integer shift_right_i, shift_right_j;
-	reg[9:0] n, m; // number of rows, number of columns, number of valid moves 
+	reg signed [9:0] n, m; // number of rows, number of columns, number of valid moves 
 	reg [9:0] k;
 	wire [9:0] update_valid_move_k;
 	integer round;
@@ -66,6 +66,7 @@ module Trax(output tx, input rx, clk, reset);
 	reg next_end_receive;
 
 	reg flag1, flag2, flag3, flag4;
+	reg auto_end_flag; 
 
 /*	generate
 		for(i=0;i<`MAX_ROW;i=i+1) begin
@@ -84,6 +85,9 @@ module Trax(output tx, input rx, clk, reset);
 */
 
 	always @(posedge clk) begin
+	  if (start_transmit) begin
+		  start_transmit <= 1'b0;
+	  end
 		if (reset) begin
 			auto_complete_sig <= 1'b0;
 			choose_move_sig <= 1'b0;
@@ -120,6 +124,8 @@ module Trax(output tx, input rx, clk, reset);
 		  	c = -1;
 		end
 		else if (auto_complete_sig) begin
+			auto_end_flag = 0;
+			////$dispay($time, " : autocomplete");
 			if (i <= n - 1 && j < m - 1) begin
 				j = j + 1;
 				auto_complete_up_cell = (i > 0) ? game_table_copy[i - 1][j] : 3'b000;
@@ -138,6 +144,7 @@ module Trax(output tx, input rx, clk, reset);
 			else begin	// Auto Complete is Done!
 				i = 0;
 				j = -1;
+				auto_end_flag = 1;
 				if (is_table_changed) begin
 					is_table_changed = 1'b0;
 					auto_complete_sig = 1'b1;
@@ -150,12 +157,13 @@ module Trax(output tx, input rx, clk, reset);
 					auto_complete_sig = 1'b0;
 				end
 			end
-			if (auto_complete_is_table_changed == 1'b1) begin
+			if (auto_complete_is_table_changed == 1'b1 && auto_end_flag == 1'b0) begin
 				is_table_changed <= is_table_changed || auto_complete_is_table_changed;
 				game_table_copy[i][j] = auto_complete_out_cell;
 			end
 		end
 		else if (choose_move_sig) begin
+			////$dispay($time, " : choose_move");
 			if (r <= n - 1 && c < m - 1) begin
 				c = c + 1;
 				update_valid_move_curr_cell = game_table[r][c];
@@ -193,16 +201,20 @@ module Trax(output tx, input rx, clk, reset);
 			end
 		end
 		else if (update_copy_map_sig) begin
+			////$dispay($time, " : update_copy_map");
 			if (i <= n - 1 && j < m - 1) begin
+				////$dispay($time, " : first if");
 				j = j + 1;
 				game_table_copy[i][j] = game_table[i][j];
 			end
 			else if (i <= n - 2 && j >= m - 1) begin
+				////$dispay($time, " : second if");
 				i = i + 1;
 				j = 0;
 				game_table_copy[i][j] = game_table[i][j];
 			end
 			else begin
+				////$dispay($time, " : third if");
 				i = 0;
 				j = -1;
 				r = move[9:0];
@@ -262,6 +274,7 @@ module Trax(output tx, input rx, clk, reset);
 			end
 		end
 		else if (copy_to_map_sig) begin
+			////$dispay($time, " : copy to map");
 		  	if (i <= n - 1 && j < m - 1) begin
 				j = j + 1;
 				game_table[i][j] = game_table_copy[i][j];
@@ -316,12 +329,14 @@ module Trax(output tx, input rx, clk, reset);
 					
 				if(m > `MAX_COL)
 					m = `MAX_COL;
-			end	
-			copy_to_map_sig = 1'b0;
-			copy_to_map_sig_done = 1'b1;
-			// now game_table is updated and n & m are updated too. 					
+
+				copy_to_map_sig = 1'b0;
+				copy_to_map_sig_done = 1'b1;
+				// now game_table is updated and n & m are updated too. 
+			end						
 		end
 		else if (shift_down_sig) begin
+			//$dispay($time, " : shift down");
 			if (shift_down_i >= 0 && shift_down_j < m - 1) begin
 				shift_down_j = shift_down_j + 1;
 				if(shift_down_i < n - 1 && shift_down_j < m) begin
@@ -346,17 +361,19 @@ module Trax(output tx, input rx, clk, reset);
 					n = n + 1'b1;
 					shift_down_sig = 1'b0;
 					shift_down_sig_done = 1'b1;
+					//$dispay($time, " : shift down %b", game_table[1][0]);
 				end
 			end
 		end
 		else if (shift_right_sig) begin
+			//$dispay($time, " : shift right");
 			if (shift_right_i <= n - 1 && shift_right_j >= 1) begin
 				shift_right_j = shift_right_j - 1;
 				if(shift_right_i < n && shift_right_j < m - 1 && shift_right_j >= 0) begin
 					game_table[shift_right_i][shift_right_j + 1] = game_table[shift_right_i][shift_right_j];
 				end
 			end
-			else if (shift_right_i < n - 1 && shift_right_j < 0) begin
+			else if (shift_right_i < n - 1 && shift_right_j <= 0) begin
 				shift_right_i = shift_right_i + 1;
 				shift_right_j = m - 2;
 				if(shift_right_i < n && shift_right_j < m - 1) begin
@@ -371,18 +388,18 @@ module Trax(output tx, input rx, clk, reset);
 				end
 				else begin
 					m = m + 1'b1;
+					i = 0;
 					shift_right_sig = 1'b0;
 					shift_right_sig_done = 1'b1;
+					//$dispay($time, " : shift right %b", game_table[1][1]);
 				end
 			end
 		end
 		else begin
 			prev_end_receive <= next_end_receive;
 			next_end_receive <= end_receive;
-		
-			if (start_transmit == 1'b1) begin
-				start_transmit <= 1'b0;
-			end
+		  
+		  
 			if (prev_end_receive == 0 && next_end_receive == 1) begin
 				round = round + 1;
 				move <= move_out;
@@ -399,13 +416,15 @@ module Trax(output tx, input rx, clk, reset);
 				 	end  
 				end
 				else begin
-					work_step_done <= 1'b1;
+					work_step_done <= 1'b0;
 				end
 			end
 			else if (~(prev_end_receive == 0 && next_end_receive == 1) && work_step_done == 1'b0) begin // Data Received!
+				//$dispay($time, " : start processing");
 				if (step == 0) begin
 					move <= move_out;
 					update_copy_map_sig <= 1'b1;
+					k <= 0; 
 					step = step + 1;
 				end
 				else if (step == 1 && update_copy_map_sig_done) begin
@@ -426,7 +445,8 @@ module Trax(output tx, input rx, clk, reset);
 				end
 				else if (step == 3 && choose_move_sig_done) begin
 					choose_move_sig_done <= 1'b0;
-					move = valid_moves[0];
+					move_in = valid_moves[0];
+					move = move_in; 
 					update_copy_map_sig <= 1'b1;
 					step = step + 1;
 				end
@@ -447,8 +467,9 @@ module Trax(output tx, input rx, clk, reset);
 				end
 			end
 			else begin
-				//$display("We Are DEAD!!");
+				////$dispay("We Are DEAD!!");
 			end
 		end
 	end
 endmodule
+
