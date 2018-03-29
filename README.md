@@ -4,7 +4,7 @@ Digital Systems Design Project
 , Tir 30th, 1396
 
 # Information
-Trax is a game which you can give some information about it from here:
+Trax is a game which you can get some information about it from here:
 http://www.traxgame.com
 
 # Project's Goal
